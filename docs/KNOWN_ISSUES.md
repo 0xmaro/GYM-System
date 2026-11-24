@@ -17,6 +17,11 @@
 - [ ] The `AttendanceCheckin` event is never dispatched anywhere.
 - [ ] The `useReverb` hook is never used by any page, so the frontend doesn't listen to any channel.
 
+## Docs that describe features which don't exist
+- [ ] `EDGE_CASE_TESTS.md` EC-15 and `emergency-procedures.md` describe an offline mode (attendance stored in IndexedDB and synced later). The frontend has no code for it. Either build it or remove it from the docs so nobody relies on it.
+- [ ] `FINAL_CHECKLIST.md` checks the WhatsApp service on port 3001, but the bot in use is on 5004.
+- [ ] Import cycle in the bot: `server.js` ↔ `services/whatsappService.js`.
+
 ## Database / migrations
 - [ ] Two migrations are named `xxxx_create_whatsapp_*`. **Don't rename them** without updating the `migrations` table in production first, or they'll run again.
 - [x] The `add_session_to_attendance_type_enum` migration used to break SQLite, so no test could run. Fixed: it now skips anything that isn't MySQL.
