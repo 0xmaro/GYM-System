@@ -1,0 +1,5 @@
+/home/maro/projects/myygemm/gymos/CLAUDE.md
+/home/maro/projects/myygemm/gymos/DEPLOYMENT.md
+/home/maro/projects/myygemm/gymos/EDGE_CASE_TESTS.md
+/home/maro/projects/myygemm/gymos/app/docs/guides/FINAL_CHECKLIST.md
+/home/maro/projects/myygemm/gymos/app/docs/guides/emergency-procedures.md
