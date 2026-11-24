@@ -18,3 +18,4 @@ whatsapp-bot/*.json
 *.png
 README.md
 public/robots.txt
+.claude/

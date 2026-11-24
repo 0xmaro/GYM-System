@@ -24,17 +24,22 @@ php artisan queue:work       # needed for WhatsApp, receipt PDF, and reminder jo
 php artisan schedule:work    # runs the scheduled jobs in routes/console.php locally
 ```
 
-Tests run against in-memory SQLite (see `phpunit.xml`), while the real app uses MySQL. Raw SQL or MySQL-specific features (enum alterations, `CURDATE()`) can behave differently under test.
+Tests run against in-memory SQLite (see `phpunit.xml`), while the real app uses MySQL. Raw SQL or MySQL-specific features (enum alterations, `CURDATE()`) can behave differently under test, so guard raw `ALTER ... MODIFY` in migrations with `DB::getDriverName()`. Baseline as of 2026-11-24: 17 tests pass and 2 fail. The 2 failures are real bugs tracked in `docs/KNOWN_ISSUES.md`.
 
-Custom artisan commands live in `app/Console/Commands` (`gymos:monitor-whatsapp`, `gymos:monitor-queues`, `whatsapp:send-scheduled`, an Excel client import, password reset, a health check). Backups use spatie/laravel-backup.
+Custom artisan commands (`app/Console/Commands`): `gymos:monitor-whatsapp`, `gymos:monitor-queues`, `gymos:cleanup`, `gymos:import-clients`, `gymos:reset-password`, `whatsapp:send-scheduled`. Backups use spatie/laravel-backup.
+
+## Before fixing anything
+- `docs/KNOWN_ISSUES.md` is the bug backlog, and `docs/PERMISSIONS.md` is the full analysis of the current access-control system, which is broken and slated for a rework. Read the relevant one first and tick items off as they're fixed.
+- Project skills: `.claude/skills/gymos-bugfix` (test-first fix workflow and pitfalls) and `.claude/skills/gymos-dev` (running the stack).
+- `graphify-out/` holds a knowledge graph of the codebase (`GRAPH_REPORT.md`, `graph.html`). Use `/graphify query "..."` for structural questions, and `/graphify . --update` after big changes.
 
 ## Architecture
 
 ### Backend (Laravel)
 - **Everything is under `/api/v1`** (`routes/api.php`), with Sanctum bearer tokens. `routes/web.php` is a catch-all that returns `welcome.blade.php`, which mounts the React app. Any new web route must go before that catch-all.
 - **API middleware stack** (`bootstrap/app.php`): `ForceJsonResponse` runs first. `SecurityHeaders`, `SanitizeInput` and `PreventImmutableModification` run last. The last one returns 405 for any PUT, PATCH or DELETE on `audit-logs/*` and `transactions/*`. Financial and audit records are append-only by design, so fix a mistake by adding a reversing record, not by editing.
-- **Roles** are `admin`, `reception` and `captain` (the `users.role` column). Routes are gated with `role:admin`. Users also carry a `permissions` JSON array that the frontend checks.
-- **Gender isolation:** `users.gender_access` is `male`, `female` or `both`. `GenderScope` is a global scope on `Client`, so staff silently never see clients of the other gender. Queries that must cross genders (system jobs, admin tools) need `withoutGlobalScope(GenderScope::class)`. Requests with no authenticated user (queues, the scheduler) are not filtered.
+- **Roles** are `admin`, `reception` and `captain` (the `users.role` column). The only server-side gate is `role:admin` on some routes. Everything else is open to any logged-in user. Users also carry a `permissions` JSON array of page keys, which only the frontend checks and which the backend never saves. See `docs/PERMISSIONS.md`.
+- **Gender isolation:** `users.gender_access` is `male`, `female` or `both`. `GenderScope` is a global scope on `Client` only, so staff don't see clients of the other gender. Queries that must cross genders need `withoutGlobalScope(GenderScope::class)`. Requests with no authenticated user (queues, the scheduler) are not filtered. Known holes are listed in `docs/PERMISSIONS.md`.
 - **Money is stored as integer piasters** (1 EGP = 100). Use `App\Helpers\Money::toPiasters()` and `Money::format()`. In JS, use `formatMoney()` from `resources/js/lib/api.js`. Never store floats.
 - **Side effects run through Observers**, which are registered in `AppServiceProvider` for Client, ClientSubscription, Attendance, Transaction and StaffShift. These observers write audit logs and dispatch the WhatsApp jobs in `app/Jobs`. The `LogsActivity` trait also writes to `audit_logs`. Check the observers before adding duplicate side effects in a controller.
 - **Business rules worth knowing:**
@@ -61,4 +66,5 @@ Custom artisan commands live in `app/Console/Commands` (`gymos:monitor-whatsapp`
 - `EDGE_CASE_TESTS.md`: 15 edge-case scenarios covering data integrity, security, and the expected status codes and messages. These are the intended behaviors for attendance, freezes, shifts, discounts and gender access.
 - `DEPLOYMENT.md`: local development with Laragon or Herd, and production on Ubuntu with Nginx and certbot. In production, the queue worker and Reverb must run as background services.
 - `app/docs/guides/`: emergency procedures and a final launch checklist.
-- `gymos_structure.sql` and `gymos-full.sql` are database dumps, and `*.tar.gz` and `public.zip` are archives. None of them is source code.
+- The old DB dumps and code archives were moved to `../gymos-archive/`, outside the repo. `.gitignore` blocks `*.sql`, `*.zip`, `*.tar.gz`, `.env` files and the WhatsApp session folders. Never commit them.
+- Migrations named `xxxx_create_whatsapp_*` are already applied in production under those names. Don't rename them.

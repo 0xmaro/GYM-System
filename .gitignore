@@ -41,3 +41,5 @@ Thumbs.db
 /whatsapp-bot/*.json.bak
 /public/cards
 /graphify-out/cache
+
+# graphify: keep the report/graph, ignore cache
